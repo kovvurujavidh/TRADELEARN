@@ -1,14 +1,7 @@
 // TradeLearn - Smart Trading Journal & Learning Hub
-// Zero-dependency Vanilla JS with Cloud Sync, Backup, & Local Storage Persistence
+// Full-Stack Architecture with Centralized Database & REST API
 
-const STORAGE_TRADES = 'tradeJournalData';
-const STORAGE_LEARNS = 'tradeJournalLearns';
-const STORAGE_STRATEGY = 'tradeJournalStrategy';
-const STORAGE_SYNC_KEY = 'tradeJournalSyncKey';
-const STORAGE_AUTO_SYNC = 'tradeJournalAutoSync';
-const STORAGE_LAST_SYNC = 'tradeJournalLastSync';
-
-const CLOUD_SYNC_ENDPOINT = 'https://kvdb.io/goE6v9kE86aF7fCgU2sQ4n/';
+const API_BASE = '/api';
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_SIZE = 8 * 1024 * 1024; // 8MB upload limit
 
@@ -29,7 +22,7 @@ let learnPendingPhotos = [];
 let editingStrategyId = null;
 let viewTradeId = null;
 let viewLearnId = null;
-let autoSyncTimeout = null;
+let healthCheckTimer = null;
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -39,30 +32,11 @@ function cacheEls() {
   Object.assign(els, {
     headerDate: $('#headerDate'),
     themeToggle: $('#themeToggle'),
-    syncHeaderBtn: $('#syncHeaderBtn'),
-    syncDot: $('#syncDot'),
-    syncModal: $('#syncModal'),
-    closeSyncModalBtn: $('#closeSyncModalBtn'),
-    closeSyncModalFooterBtn: $('#closeSyncModalFooterBtn'),
-    syncKeyInput: $('#syncKeyInput'),
-    generateKeyBtn: $('#generateKeyBtn'),
-    copyKeyBtn: $('#copyKeyBtn'),
-    syncStatusIndicator: $('#syncStatusIndicator'),
-    uploadCloudBtn: $('#uploadCloudBtn'),
-    downloadCloudBtn: $('#downloadCloudBtn'),
-    autoSyncToggle: $('#autoSyncToggle'),
-    syncQrImg: $('#syncQrImg'),
-    qrPlaceholder: $('#qrPlaceholder'),
-    copySyncUrlBtn: $('#copySyncUrlBtn'),
-    modalExportBackupBtn: $('#modalExportBackupBtn'),
-    modalRestoreBackupBtn: $('#modalRestoreBackupBtn'),
+    dbBadge: $('#dbBadge'),
+
     exportBackupBtn: $('#exportBackupBtn'),
     restoreBackupBtn: $('#restoreBackupBtn'),
     importBackupFile: $('#importBackupFile'),
-    syncQuickBtn: $('#syncQuickBtn'),
-    emptySyncBtn: $('#emptySyncBtn'),
-    learnSyncBtn: $('#learnSyncBtn'),
-    storageUsageText: $('#storageUsageText'),
 
     tradeForm: $('#tradeForm'),
     editId: $('#editId'),
@@ -84,7 +58,6 @@ function cacheEls() {
     statStreak: $('#statStreak'),
     breakdownGrid: $('#breakdownGrid'),
     exportCsvBtn: $('#exportCsvBtn'),
-    exportExcelBtn: $('#exportExcelBtn'),
     importBtn: $('#importBtn'),
     importFile: $('#importFile'),
     clearAllBtn: $('#clearAllBtn'),
@@ -149,16 +122,24 @@ function cacheEls() {
 
 // ---------------------- INITIALIZATION ----------------------
 
-function init() {
+async function init() {
   cacheEls();
   loadTheme();
   setHeaderDate();
-  loadData();
-  initSync();
-  renderAll();
-  renderLearnAll();
-  renderStrategy();
+  setDefaultDates();
   bindEvents();
+
+  // Initial database health check & fetch data
+  await checkDbHealth();
+  await Promise.all([
+    fetchTrades(),
+    fetchLearns(),
+    fetchStrategies()
+  ]);
+
+  // Periodic health check every 10 seconds
+  if (healthCheckTimer) clearInterval(healthCheckTimer);
+  healthCheckTimer = setInterval(checkDbHealth, 10000);
 }
 
 function setHeaderDate() {
@@ -173,6 +154,14 @@ function setHeaderDate() {
   }
 }
 
+function setDefaultDates() {
+  const today = new Date().toISOString().split('T')[0];
+  const fieldDate = $('#fieldDate');
+  if (fieldDate && !fieldDate.value) fieldDate.value = today;
+  const learnDate = $('#learnDate');
+  if (learnDate && !learnDate.value) learnDate.value = today;
+}
+
 function loadTheme() {
   const s = localStorage.getItem('tradeJournalTheme') || 'light';
   document.documentElement.setAttribute('data-theme', s);
@@ -185,77 +174,219 @@ function toggleTheme() {
   localStorage.setItem('tradeJournalTheme', n);
 }
 
-// ---------------------- DATA STORAGE & RETRIEVAL ----------------------
+// ---------------------- DATABASE API CALLS ----------------------
 
-function loadData() {
+async function checkDbHealth() {
   try {
-    const r = localStorage.getItem(STORAGE_TRADES);
-    trades = r ? JSON.parse(r) : [];
-  } catch (e) {
-    trades = [];
-  }
-
-  try {
-    const r2 = localStorage.getItem(STORAGE_LEARNS);
-    learns = r2 ? JSON.parse(r2) : [];
-  } catch (e) {
-    learns = [];
-  }
-
-  try {
-    const r3 = localStorage.getItem(STORAGE_STRATEGY);
-    if (r3) {
-      const p = JSON.parse(r3);
-      if (Array.isArray(p)) strategies = p;
-      else if (typeof p === 'object' && p !== null) strategies = [p];
-      else {
-        strategies = [{
-          id: genId(),
-          title: 'My Strategy',
-          content: r3 || '',
-          date: new Date().toISOString().split('T')[0],
-          createdAt: Date.now()
-        }];
-        saveStrategies();
-      }
-    } else {
-      strategies = [];
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error('Health status error');
+    const data = await res.json();
+    if (els.dbBadge) {
+      els.dbBadge.className = 'db-badge connected';
+      els.dbBadge.textContent = '🟢 DB Connected (' + (data.database === 'postgresql' ? 'Postgres' : 'SQLite') + ')';
     }
-  } catch (e) {
-    strategies = [];
-  }
-}
-
-function safeLocalStorageSet(key, value) {
-  try {
-    localStorage.setItem(key, value);
     return true;
-  } catch (e) {
-    if (e.name === 'QuotaExceededError' || e.code === 22) {
-      showToast('⚠️ Storage quota reached! Photos compressed to save space.');
+  } catch (err) {
+    if (els.dbBadge) {
+      els.dbBadge.className = 'db-badge disconnected';
+      els.dbBadge.textContent = '🔴 DB Offline';
     }
     return false;
   }
 }
 
-function saveTrades() {
-  safeLocalStorageSet(STORAGE_TRADES, JSON.stringify(trades));
-  triggerAutoSync();
+// Trades
+async function fetchTrades() {
+  try {
+    const res = await fetch(`${API_BASE}/trades`);
+    if (!res.ok) throw new Error('Failed to load trades');
+    trades = await res.json();
+    renderAll();
+  } catch (err) {
+    console.error('Error fetching trades:', err);
+    showToast('⚠️ Could not connect to database.');
+  }
 }
 
-function saveLearns() {
-  safeLocalStorageSet(STORAGE_LEARNS, JSON.stringify(learns));
-  triggerAutoSync();
+async function apiSaveTrade(tradeData, id) {
+  const url = id ? `${API_BASE}/trades/${encodeURIComponent(id)}` : `${API_BASE}/trades`;
+  const method = id ? 'PUT' : 'POST';
+
+  const res = await fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tradeData)
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to save trade');
+  }
+  return await res.json();
 }
 
-function saveStrategies() {
-  safeLocalStorageSet(STORAGE_STRATEGY, JSON.stringify(strategies));
-  triggerAutoSync();
+async function apiDeleteTrade(id) {
+  const res = await fetch(`${API_BASE}/trades/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete trade');
+  return await res.json();
 }
 
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+async function apiClearTrades() {
+  const res = await fetch(`${API_BASE}/trades`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to clear trades');
+  return await res.json();
 }
+
+// Learns
+async function fetchLearns() {
+  try {
+    const res = await fetch(`${API_BASE}/learns`);
+    if (!res.ok) throw new Error('Failed to load learnings');
+    learns = await res.json();
+    renderLearnAll();
+  } catch (err) {
+    console.error('Error fetching learnings:', err);
+  }
+}
+
+async function apiSaveLearn(learnData, id) {
+  const url = id ? `${API_BASE}/learns/${encodeURIComponent(id)}` : `${API_BASE}/learns`;
+  const method = id ? 'PUT' : 'POST';
+
+  const res = await fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(learnData)
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to save learning');
+  }
+  return await res.json();
+}
+
+async function apiDeleteLearn(id) {
+  const res = await fetch(`${API_BASE}/learns/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete learning');
+  return await res.json();
+}
+
+async function apiClearLearns() {
+  const res = await fetch(`${API_BASE}/learns`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to clear learnings');
+  return await res.json();
+}
+
+// Strategies
+async function fetchStrategies() {
+  try {
+    const res = await fetch(`${API_BASE}/strategies`);
+    if (!res.ok) throw new Error('Failed to load strategies');
+    strategies = await res.json();
+    renderStrategy();
+  } catch (err) {
+    console.error('Error fetching strategies:', err);
+  }
+}
+
+async function apiSaveStrategy(strategyData, id) {
+  const url = id ? `${API_BASE}/strategies/${encodeURIComponent(id)}` : `${API_BASE}/strategies`;
+  const method = id ? 'PUT' : 'POST';
+
+  const res = await fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(strategyData)
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to save strategy');
+  }
+  return await res.json();
+}
+
+async function apiDeleteStrategy(id) {
+  const res = await fetch(`${API_BASE}/strategies/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete strategy');
+  return await res.json();
+}
+
+// ---------------------- BACKUP & RESTORE ----------------------
+
+async function exportFullBackup() {
+  try {
+    const res = await fetch(`${API_BASE}/backup`);
+    if (!res.ok) throw new Error('Failed to export backup from server');
+    const data = await res.json();
+    const jsonStr = JSON.stringify(data, null, 2);
+    const dateSlug = new Date().toISOString().split('T')[0];
+    dlFile(jsonStr, `tradelearn-db-backup-${dateSlug}.json`, 'application/json;charset=utf-8;');
+    showToast('💾 Database backup downloaded (.json)');
+  } catch (err) {
+    console.error('Backup error:', err);
+    showToast('⚠️ Failed to export backup: ' + err.message);
+  }
+}
+
+function triggerBackupRestore() {
+  if (els.importBackupFile) els.importBackupFile.click();
+}
+
+async function handleBackupFileImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data || typeof data !== 'object') {
+        showToast('Invalid backup file format.');
+        return;
+      }
+
+      const tradeCount = Array.isArray(data.trades) ? data.trades.length : 0;
+      const learnCount = Array.isArray(data.learns) ? data.learns.length : 0;
+      const stratCount = Array.isArray(data.strategies) ? data.strategies.length : 0;
+
+      const msg = `Restore database with ${tradeCount} trades, ${learnCount} learnings, and ${stratCount} strategies? (This will overwrite current DB)`;
+      if (!confirm(msg)) {
+        e.target.value = '';
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/backup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!res.ok) throw new Error('Failed to restore backup to database');
+
+      await Promise.all([fetchTrades(), fetchLearns(), fetchStrategies()]);
+      showToast('✅ Database restored successfully!');
+    } catch (err) {
+      console.error('Restore error:', err);
+      showToast('⚠️ Could not restore backup: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ---------------------- HELPERS ----------------------
 
 function fmtDate(d) {
   if (!d) return '';
@@ -284,413 +415,12 @@ function showToast(m) {
   }, 3500);
 }
 
-// ---------------------- CLOUD SYNC & BACKUP LOGIC ----------------------
-
-function initSync() {
-  // Check URL hash or query params for instant connection e.g. #sync=TRD-KEY
-  let urlSyncKey = '';
-  const hash = window.location.hash;
-  if (hash && hash.indexOf('sync=') !== -1) {
-    urlSyncKey = decodeURIComponent(hash.split('sync=')[1].split('&')[0]);
-  } else {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('sync')) {
-      urlSyncKey = params.get('sync');
-    }
-  }
-
-  let currentKey = localStorage.getItem(STORAGE_SYNC_KEY);
-
-  if (urlSyncKey) {
-    currentKey = urlSyncKey.trim();
-    localStorage.setItem(STORAGE_SYNC_KEY, currentKey);
-    // Clear hash for clean URL
-    try {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    } catch (e) {}
-  }
-
-  if (!currentKey) {
-    currentKey = 'TRD-' + Math.random().toString(36).substring(2, 7).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
-    localStorage.setItem(STORAGE_SYNC_KEY, currentKey);
-  }
-
-  if (els.syncKeyInput) {
-    els.syncKeyInput.value = currentKey;
-  }
-
-  const isAutoSync = localStorage.getItem(STORAGE_AUTO_SYNC) === 'true';
-  if (els.autoSyncToggle) {
-    els.autoSyncToggle.checked = isAutoSync;
-  }
-
-  updateSyncUI(currentKey);
-
-  // If connected via URL hash or Auto-Sync enabled, pull cloud data automatically
-  if (urlSyncKey) {
-    showToast('🔗 Connected to Sync Key from link!');
-    downloadFromCloud(false);
-  } else if (isAutoSync && trades.length === 0) {
-    // Empty on mobile, check cloud automatically
-    downloadFromCloud(false);
-  }
-}
-
-function getSanitizedKey(k) {
-  return encodeURIComponent((k || '').trim().replace(/[^a-zA-Z0-9_-]/g, ''));
-}
-
-function updateSyncUI(key) {
-  const safeKey = (key || '').trim();
-  const lastSync = localStorage.getItem(STORAGE_LAST_SYNC);
-
-  if (els.syncStatusIndicator) {
-    if (lastSync) {
-      const timeStr = new Date(parseInt(lastSync, 10)).toLocaleString();
-      els.syncStatusIndicator.textContent = 'Last synced: ' + timeStr + ' (' + trades.length + ' trades)';
-      els.syncStatusIndicator.style.color = 'var(--green)';
-    } else {
-      els.syncStatusIndicator.textContent = 'Status: Ready to sync with key "' + safeKey + '"';
-      els.syncStatusIndicator.style.color = 'var(--text-secondary)';
-    }
-  }
-
-  if (els.syncDot) {
-    if (lastSync) {
-      els.syncDot.className = 'sync-dot synced';
-    } else {
-      els.syncDot.className = 'sync-dot';
-    }
-  }
-
-  // Generate mobile direct link and QR code
-  const currentOrigin = window.location.origin === 'null' || !window.location.origin || window.location.protocol === 'file:'
-    ? 'https://tradelearn.netlify.app'
-    : (window.location.origin + window.location.pathname);
-
-  const directMobileUrl = currentOrigin + (currentOrigin.indexOf('?') === -1 ? '#' : '&') + 'sync=' + encodeURIComponent(safeKey);
-
-  if (els.syncQrImg && els.qrPlaceholder) {
-    if (safeKey) {
-      const qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(directMobileUrl);
-      els.syncQrImg.src = qrApiUrl;
-      els.syncQrImg.style.display = 'block';
-      els.qrPlaceholder.style.display = 'none';
-    } else {
-      els.syncQrImg.style.display = 'none';
-      els.qrPlaceholder.style.display = 'block';
-    }
-  }
-
-  updateStorageMeter();
-}
-
-function setSyncingState(isSyncing) {
-  if (els.syncDot) {
-    els.syncDot.className = isSyncing ? 'sync-dot syncing' : (localStorage.getItem(STORAGE_LAST_SYNC) ? 'sync-dot synced' : 'sync-dot');
-  }
-  if (els.uploadCloudBtn) els.uploadCloudBtn.disabled = isSyncing;
-  if (els.downloadCloudBtn) els.downloadCloudBtn.disabled = isSyncing;
-}
-
-function uploadToCloud(manual) {
-  const key = (els.syncKeyInput ? els.syncKeyInput.value : localStorage.getItem(STORAGE_SYNC_KEY) || '').trim();
-  if (!key) {
-    showToast('Please enter a Sync Key first.');
-    return;
-  }
-
-  const safeKey = getSanitizedKey(key);
-  setSyncingState(true);
-  if (els.syncStatusIndicator) {
-    els.syncStatusIndicator.textContent = 'Uploading to cloud...';
-    els.syncStatusIndicator.style.color = 'var(--accent)';
-  }
-
-  const payload = {
-    version: 1,
-    key: safeKey,
-    updatedAt: Date.now(),
-    trades: trades,
-    learns: learns,
-    strategies: strategies,
-    theme: localStorage.getItem('tradeJournalTheme') || 'light'
-  };
-
-  fetch(CLOUD_SYNC_ENDPOINT + safeKey, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(function(res) {
-    if (!res.ok) throw new Error('Cloud response ' + res.status);
-    return res.text();
-  })
-  .then(function() {
-    const now = Date.now();
-    localStorage.setItem(STORAGE_SYNC_KEY, key);
-    localStorage.setItem(STORAGE_LAST_SYNC, now.toString());
-    setSyncingState(false);
-    updateSyncUI(key);
-    if (manual !== false) {
-      showToast('☁️ Uploaded successfully! Scan QR or download on mobile.');
-    }
-  })
-  .catch(function(err) {
-    console.warn('Sync upload notice:', err);
-    setSyncingState(false);
-    if (els.syncStatusIndicator) {
-      els.syncStatusIndicator.textContent = 'Upload failed. Check internet connection.';
-      els.syncStatusIndicator.style.color = 'var(--red)';
-    }
-    if (manual !== false) {
-      showToast('⚠️ Cloud sync upload failed. Check your connection.');
-    }
-  });
-}
-
-function downloadFromCloud(manual) {
-  const key = (els.syncKeyInput ? els.syncKeyInput.value : localStorage.getItem(STORAGE_SYNC_KEY) || '').trim();
-  if (!key) {
-    showToast('Please enter a Sync Key first.');
-    return;
-  }
-
-  const safeKey = getSanitizedKey(key);
-  setSyncingState(true);
-  if (els.syncStatusIndicator) {
-    els.syncStatusIndicator.textContent = 'Downloading latest data from cloud...';
-    els.syncStatusIndicator.style.color = 'var(--accent)';
-  }
-
-  fetch(CLOUD_SYNC_ENDPOINT + safeKey, {
-    method: 'GET',
-    headers: { 'Accept': 'application/json' }
-  })
-  .then(function(res) {
-    if (res.status === 404) {
-      throw new Error('KEY_NOT_FOUND');
-    }
-    if (!res.ok) throw new Error('Cloud response ' + res.status);
-    return res.json();
-  })
-  .then(function(data) {
-    setSyncingState(false);
-    if (!data || (!data.trades && !data.learns && !data.strategies)) {
-      if (manual !== false) {
-        showToast('No saved trades found in cloud for this key yet. Try "Upload to Cloud" first on your laptop.');
-      }
-      return;
-    }
-
-    trades = Array.isArray(data.trades) ? data.trades : [];
-    learns = Array.isArray(data.learns) ? data.learns : [];
-    strategies = Array.isArray(data.strategies) ? data.strategies : [];
-
-    if (data.theme) {
-      localStorage.setItem('tradeJournalTheme', data.theme);
-      loadTheme();
-    }
-
-    saveTrades();
-    saveLearns();
-    saveStrategies();
-
-    const now = Date.now();
-    localStorage.setItem(STORAGE_SYNC_KEY, key);
-    localStorage.setItem(STORAGE_LAST_SYNC, now.toString());
-
-    renderAll();
-    renderLearnAll();
-    renderStrategy();
-    updateSyncUI(key);
-
-    showToast('✅ Synced! Loaded ' + trades.length + ' trade' + (trades.length !== 1 ? 's' : '') + ' from cloud.');
-  })
-  .catch(function(err) {
-    console.warn('Sync download notice:', err);
-    setSyncingState(false);
-    if (err.message === 'KEY_NOT_FOUND') {
-      if (els.syncStatusIndicator) {
-        els.syncStatusIndicator.textContent = 'No cloud data found for key "' + safeKey + '".';
-        els.syncStatusIndicator.style.color = 'var(--text-secondary)';
-      }
-      if (manual !== false) {
-        showToast('No cloud data found. Upload from your laptop first!');
-      }
-    } else {
-      if (els.syncStatusIndicator) {
-        els.syncStatusIndicator.textContent = 'Download failed. Check internet connection.';
-        els.syncStatusIndicator.style.color = 'var(--red)';
-      }
-      if (manual !== false) {
-        showToast('⚠️ Could not connect to cloud sync server.');
-      }
-    }
-  });
-}
-
-function triggerAutoSync() {
-  if (localStorage.getItem(STORAGE_AUTO_SYNC) !== 'true') return;
-  const key = localStorage.getItem(STORAGE_SYNC_KEY);
-  if (!key) return;
-
-  if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
-  autoSyncTimeout = setTimeout(function() {
-    uploadToCloud(false);
-  }, 1200);
-}
-
-function openSyncModal() {
-  const currentKey = localStorage.getItem(STORAGE_SYNC_KEY) || (els.syncKeyInput ? els.syncKeyInput.value : '');
-  if (els.syncKeyInput) els.syncKeyInput.value = currentKey;
-  updateSyncUI(currentKey);
-  if (els.syncModal) els.syncModal.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeSyncModal() {
-  if (els.syncModal) els.syncModal.classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-function generateNewKey() {
-  const newKey = 'TRD-' + Math.random().toString(36).substring(2, 7).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
-  if (els.syncKeyInput) els.syncKeyInput.value = newKey;
-  localStorage.setItem(STORAGE_SYNC_KEY, newKey);
-  updateSyncUI(newKey);
-  showToast('Generated new key: ' + newKey);
-}
-
-function copySyncKey() {
-  const key = (els.syncKeyInput ? els.syncKeyInput.value : localStorage.getItem(STORAGE_SYNC_KEY) || '').trim();
-  if (!key) return;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(key).then(function() {
-      showToast('📋 Sync Key copied to clipboard!');
-    });
-  } else {
-    showToast('Key: ' + key);
-  }
-}
-
-function copyMobileDirectLink() {
-  const key = (els.syncKeyInput ? els.syncKeyInput.value : localStorage.getItem(STORAGE_SYNC_KEY) || '').trim();
-  const currentOrigin = window.location.origin === 'null' || !window.location.origin || window.location.protocol === 'file:'
-    ? 'https://tradelearn.netlify.app'
-    : (window.location.origin + window.location.pathname);
-  const directMobileUrl = currentOrigin + (currentOrigin.indexOf('?') === -1 ? '#' : '&') + 'sync=' + encodeURIComponent(key);
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(directMobileUrl).then(function() {
-      showToast('🔗 Direct mobile link copied to clipboard!');
-    });
-  } else {
-    showToast('Link: ' + directMobileUrl);
-  }
-}
-
-// ---------------------- 100% OFFLINE FULL BACKUP & RESTORE (JSON) ----------------------
-
-function exportFullBackup() {
-  const backupData = {
-    appName: 'TradeLearn',
-    version: 1,
-    exportDate: new Date().toISOString(),
-    trades: trades,
-    learns: learns,
-    strategies: strategies,
-    theme: localStorage.getItem('tradeJournalTheme') || 'light'
-  };
-
-  const jsonStr = JSON.stringify(backupData, null, 2);
-  const dateSlug = new Date().toISOString().split('T')[0];
-  dlFile(jsonStr, 'tradelearn-backup-' + dateSlug + '.json', 'application/json;charset=utf-8;');
-  showToast('💾 Complete backup downloaded (.json).');
-}
-
-function triggerBackupRestore() {
-  if (els.importBackupFile) els.importBackupFile.click();
-}
-
-function handleBackupFileImport(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if (!data || typeof data !== 'object') {
-        showToast('Invalid backup file format.');
-        return;
-      }
-
-      const importedTrades = Array.isArray(data.trades) ? data.trades : [];
-      const importedLearns = Array.isArray(data.learns) ? data.learns : [];
-      const importedStrategies = Array.isArray(data.strategies) ? data.strategies : [];
-
-      if (!importedTrades.length && !importedLearns.length && !importedStrategies.length) {
-        showToast('No trades or learnings found in backup file.');
-        return;
-      }
-
-      const msg = 'Restore ' + importedTrades.length + ' trades, ' + importedLearns.length + ' learnings, and ' + importedStrategies.length + ' strategies?';
-      if (!confirm(msg)) {
-        e.target.value = '';
-        return;
-      }
-
-      trades = importedTrades;
-      learns = importedLearns;
-      strategies = importedStrategies;
-
-      if (data.theme) {
-        localStorage.setItem('tradeJournalTheme', data.theme);
-        loadTheme();
-      }
-
-      saveTrades();
-      saveLearns();
-      saveStrategies();
-
-      renderAll();
-      renderLearnAll();
-      renderStrategy();
-      updateStorageMeter();
-
-      showToast('✅ Full backup restored successfully!');
-      closeSyncModal();
-    } catch (err) {
-      showToast('Could not read backup file: ' + err.message);
-    }
-    e.target.value = '';
-  };
-  reader.readAsText(file);
-}
-
-function updateStorageMeter() {
-  let totalBytes = 0;
-  for (let k in localStorage) {
-    if (localStorage.hasOwnProperty(k)) {
-      totalBytes += ((localStorage[k] || '').length * 2);
-    }
-  }
-  const kb = (totalBytes / 1024).toFixed(1);
-  const mb = (totalBytes / (1024 * 1024)).toFixed(2);
-  const str = totalBytes > 1024 * 1024 ? mb + ' MB' : kb + ' KB';
-  if (els.storageUsageText) {
-    els.storageUsageText.textContent = 'Storage used: ~' + str + ' (' + trades.length + ' trades, ' + learns.length + ' learnings, ' + strategies.length + ' strategies)';
-  }
-}
-
 // ---------------------- RENDER TRADES & STATS ----------------------
 
 function renderAll() {
   renderStats();
   renderBreakdown();
   renderHistory();
-  updateStorageMeter();
 }
 
 function renderStats() {
@@ -768,7 +498,7 @@ function getFilteredTrades() {
     const q = searchQuery.toLowerCase();
     r = r.filter(function(t) {
       return Object.keys(t).some(function(k) {
-        if (Array.isArray(l[k])) return false;
+        if (Array.isArray(t[k])) return false;
         return String(t[k]).toLowerCase().indexOf(q) !== -1;
       });
     });
@@ -789,7 +519,6 @@ function renderHistory() {
   }
 
   if (els.emptyState) els.emptyState.style.display = 'none';
-  // Note: let CSS media queries control responsive table/card switching
   if (els.tableWrap) els.tableWrap.style.display = '';
 
   let tableHtml = '';
@@ -797,7 +526,7 @@ function renderHistory() {
 
   f.forEach(function(t) {
     const pCount = (t.photos && t.photos.length) ? t.photos.length : 0;
-    const photoBadge = pCount > 0 ? '<span class="badge" style="background:var(--accent-light);color:var(--accent);font-size:0.75rem;padding:2px 7px;">📷 ' + pCount + '</span>' : '';
+    const photoBadge = pCount > 0 ? '<span class="badge" style="background:var(--accent-light);color:var(--steel-blue);font-size:0.75rem;padding:2px 7px;">📷 ' + pCount + '</span>' : '';
 
     tableHtml += '<tr data-id="' + t.id + '">' +
       '<td>' + fmtDate(t.date) + (pCount ? ' ' + photoBadge : '') + '</td>' +
@@ -909,7 +638,7 @@ function tradeViewEdit() {
 
 // ---------------------- TRADE FORM SUBMISSION ----------------------
 
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault();
   const fd = getFormData();
   if (!fd.date || !fd.bias || !fd.liquidity || !fd.sweep || !fd.mss || !fd.displacement || !fd.entry || !fd.sl || !fd.tp || !fd.result) {
@@ -918,31 +647,28 @@ function handleFormSubmit(e) {
   }
 
   const eid = els.editId.value;
-  if (eid) {
-    let idx = -1;
-    for (let i = 0; i < trades.length; i++) {
-      if (trades[i].id === eid) {
-        idx = i;
-        break;
-      }
+  try {
+    if (eid) {
+      const existing = trades.find(t => t.id === eid);
+      const np = pendingPhotos.length ? pendingPhotos : (existing ? existing.photos : []);
+      const payload = Object.assign({}, fd, { photos: np });
+      await apiSaveTrade(payload, eid);
+      showToast('✅ Trade updated in database.');
+      cancelEdit();
+    } else {
+      const payload = Object.assign({}, fd, {
+        photos: pendingPhotos.slice(),
+        createdAt: Date.now()
+      });
+      await apiSaveTrade(payload);
+      showToast('✅ Trade saved to database.');
+      resetForm();
     }
-    if (idx !== -1) {
-      const np = pendingPhotos.length ? pendingPhotos : (trades[idx].photos || []);
-      trades[idx] = Object.assign({}, trades[idx], fd, { photos: np });
-    }
-    showToast('Trade updated.');
-    cancelEdit();
-  } else {
-    trades.push(Object.assign({ id: genId() }, fd, {
-      photos: pendingPhotos.slice(),
-      createdAt: Date.now()
-    }));
-    showToast('Trade added.');
+    await fetchTrades();
+  } catch (err) {
+    console.error('Error saving trade:', err);
+    showToast('⚠️ Error saving trade: ' + err.message);
   }
-
-  saveTrades();
-  resetForm();
-  renderAll();
 }
 
 function getFormData() {
@@ -979,6 +705,7 @@ function setActiveBtn(f, v) {
 function resetForm() {
   els.tradeForm.reset();
   els.editId.value = '';
+  setDefaultDates();
   $$('.btn-group[data-field]').forEach(function(g) {
     if (g.getAttribute('data-field') === 'learnCategory') return;
     g.querySelectorAll('.seg-btn').forEach(function(b) {
@@ -998,13 +725,7 @@ function cancelEdit() {
 }
 
 function editTrade(id) {
-  let t = null;
-  for (let i = 0; i < trades.length; i++) {
-    if (trades[i].id === id) {
-      t = trades[i];
-      break;
-    }
-  }
+  const t = trades.find(x => x.id === id);
   if (!t) return;
 
   els.editId.value = t.id;
@@ -1037,19 +758,22 @@ function promptDelete(id) {
   els.deleteModal.classList.add('active');
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deleteTargetId) return;
-  if (deleteType === 'trade') {
-    trades = trades.filter(function(t) { return t.id !== deleteTargetId; });
-    saveTrades();
-    renderAll();
-  } else {
-    learns = learns.filter(function(l) { return l.id !== deleteTargetId; });
-    saveLearns();
-    renderLearnAll();
+  try {
+    if (deleteType === 'trade') {
+      await apiDeleteTrade(deleteTargetId);
+      await fetchTrades();
+      showToast('Trade deleted.');
+    } else {
+      await apiDeleteLearn(deleteTargetId);
+      await fetchLearns();
+      showToast('Learning deleted.');
+    }
+  } catch (err) {
+    showToast('⚠️ Error deleting: ' + err.message);
   }
   closeModals();
-  showToast('Deleted.');
 }
 
 function closeModals() {
@@ -1068,12 +792,15 @@ function promptClearAll() {
   els.clearModal.classList.add('active');
 }
 
-function confirmClearAll() {
-  trades = [];
-  saveTrades();
-  renderAll();
+async function confirmClearAll() {
+  try {
+    await apiClearTrades();
+    await fetchTrades();
+    showToast('All trades cleared from database.');
+  } catch (err) {
+    showToast('⚠️ Error clearing trades: ' + err.message);
+  }
   closeModals();
-  showToast('All trades cleared.');
 }
 
 // ---------------------- PHOTO UPLOAD & COMPRESSION ----------------------
@@ -1104,7 +831,6 @@ function handlePhotoFiles(files) {
     }
     const r = new FileReader();
     r.onload = function(ev) {
-      // Compress to max 900px, quality 0.75 to save storage space
       compressImg(ev.target.result, 900, 0.75, function(c) {
         pendingPhotos.push(c);
         done++;
@@ -1231,7 +957,7 @@ function lbNext() {
   updateLightbox();
 }
 
-// ---------------------- CSV & EXCEL EXPORT / IMPORT ----------------------
+// ---------------------- CSV EXPORT / IMPORT ----------------------
 
 function exportCSV() {
   if (!trades.length) {
@@ -1258,49 +984,15 @@ function csvEsc(v) {
     : s;
 }
 
-function exportExcel() {
-  if (!trades.length) {
-    showToast('No trades to export.');
-    return;
-  }
-  const h = ['Date', '15m Bias', 'Liquidity', 'Sweep', 'MSS', 'Displacement', 'Entry', 'SL', 'TP', 'Result', 'Description'];
-  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table border="1"><tr>';
-  h.forEach(function(x) {
-    html += '<th style="background:#C5ADC5;font-weight:bold;">' + x + '</th>';
-  });
-  html += '</tr>';
-  trades.sort(function(a, b) {
-    return new Date(b.date) - new Date(a.date);
-  }).forEach(function(t) {
-    const r = [t.date, t.bias, t.liquidity, t.sweep, t.mss, t.displacement, t.entry, t.sl, t.tp, t.result, t.description || ''];
-    html += '<tr>';
-    r.forEach(function(c) {
-      html += '<td>' + esc(c) + '</td>';
-    });
-    html += '</tr>';
-  });
-  html += '</table></body></html>';
-  const b = new Blob([html], { type: 'application/vnd.ms-excel' });
-  const u = URL.createObjectURL(b);
-  const a = document.createElement('a');
-  a.href = u;
-  a.download = 'trade-journal.xls';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(u);
-  showToast('Excel exported.');
-}
-
 function importData() {
   els.importFile.click();
 }
 
-function handleImport(e) {
+async function handleImport(e) {
   const f = e.target.files[0];
   if (!f) return;
   const r = new FileReader();
-  r.onload = function(ev) {
+  r.onload = async function(ev) {
     const lines = parseCSV(ev.target.result);
     if (lines.length < 2) {
       showToast('No valid trades found.');
@@ -1333,8 +1025,7 @@ function handleImport(e) {
         const m = cm[c];
         return m !== undefined ? (row[m] || '').trim() : '';
       };
-      trades.push({
-        id: genId(),
+      const tradePayload = {
         date: g(0) || new Date().toISOString().split('T')[0],
         bias: g(1) || 'Range',
         liquidity: g(2) || 'SSL',
@@ -1348,12 +1039,16 @@ function handleImport(e) {
         description: g(10) || '',
         photos: [],
         createdAt: Date.now() + i
-      });
-      imp++;
+      };
+      try {
+        await apiSaveTrade(tradePayload);
+        imp++;
+      } catch (err) {
+        console.error('Error importing row:', err);
+      }
     }
-    saveTrades();
-    renderAll();
-    showToast('Imported ' + imp + ' trade' + (imp !== 1 ? 's' : '') + '.');
+    await fetchTrades();
+    showToast('Imported ' + imp + ' trade' + (imp !== 1 ? 's' : '') + ' to database.');
   };
   r.readAsText(f);
   e.target.value = '';
@@ -1446,13 +1141,7 @@ function addNewStrategy() {
 }
 
 function openStrategyModal(id) {
-  let s = null;
-  for (let i = 0; i < strategies.length; i++) {
-    if (strategies[i].id === id) {
-      s = strategies[i];
-      break;
-    }
-  }
+  const s = strategies.find(x => x.id === id);
   if (!s) return;
   editingStrategyId = id;
   $('#strategyModalTitle').value = s.title;
@@ -1470,40 +1159,37 @@ function closeStrategyModal() {
   editingStrategyId = null;
 }
 
-function saveStrategyModal() {
+async function saveStrategyModal() {
   const title = $('#strategyModalTitle').value.trim() || 'Untitled Strategy';
   const content = $('#strategyModalTextarea').value;
   const isEdit = !!editingStrategyId;
-  if (editingStrategyId) {
-    for (let i = 0; i < strategies.length; i++) {
-      if (strategies[i].id === editingStrategyId) {
-        strategies[i].title = title;
-        strategies[i].content = content;
-        break;
-      }
-    }
-  } else {
-    strategies.push({
-      id: genId(),
+
+  try {
+    const payload = {
       title: title,
       content: content,
       date: new Date().toISOString().split('T')[0],
       createdAt: Date.now()
-    });
+    };
+    await apiSaveStrategy(payload, editingStrategyId);
+    await fetchStrategies();
+    closeStrategyModal();
+    showToast(isEdit ? 'Strategy updated.' : 'Strategy added.');
+  } catch (err) {
+    showToast('⚠️ Error saving strategy: ' + err.message);
   }
-  saveStrategies();
-  renderStrategy();
-  closeStrategyModal();
-  showToast(isEdit ? 'Strategy updated.' : 'Strategy added.');
 }
 
-function confirmDeleteStrategy() {
+async function confirmDeleteStrategy() {
   if (!editingStrategyId) return;
-  strategies = strategies.filter(function(s) { return s.id !== editingStrategyId; });
-  saveStrategies();
-  renderStrategy();
-  closeStrategyModal();
-  showToast('Strategy deleted.');
+  try {
+    await apiDeleteStrategy(editingStrategyId);
+    await fetchStrategies();
+    closeStrategyModal();
+    showToast('Strategy deleted.');
+  } catch (err) {
+    showToast('⚠️ Error deleting strategy: ' + err.message);
+  }
   editingStrategyId = null;
 }
 
@@ -1511,7 +1197,6 @@ function confirmDeleteStrategy() {
 
 function renderLearnAll() {
   renderLearnCards();
-  updateStorageMeter();
 }
 
 function renderLearnCards() {
@@ -1527,7 +1212,7 @@ function renderLearnCards() {
       const cat = l.category || 'Note';
       const catCls = 'badge-' + cat.toLowerCase();
       const pCount = (l.photos && l.photos.length) ? l.photos.length : 0;
-      const pBadge = pCount > 0 ? '<span class="badge" style="background:var(--accent-light);color:var(--accent);font-size:0.75rem;">📷 ' + pCount + '</span>' : '';
+      const pBadge = pCount > 0 ? '<span class="badge" style="background:var(--accent-light);color:var(--steel-blue);font-size:0.75rem;">📷 ' + pCount + '</span>' : '';
 
       return '<div class="learn-card" data-id="' + l.id + '">' +
         '<div class="learn-card-header">' +
@@ -1625,7 +1310,7 @@ function learnViewEdit() {
   }
 }
 
-function handleLearnSubmit(e) {
+async function handleLearnSubmit(e) {
   e.preventDefault();
   const fd = {
     date: $('#learnDate').value,
@@ -1642,40 +1327,27 @@ function handleLearnSubmit(e) {
   }
 
   const eid = els.learnEditId.value;
-  if (eid) {
-    let idx = -1;
-    for (let i = 0; i < learns.length; i++) {
-      if (learns[i].id === eid) {
-        idx = i;
-        break;
-      }
+  try {
+    if (eid) {
+      const existing = learns.find(l => l.id === eid);
+      fd.photos = learnPendingPhotos.length ? learnPendingPhotos : (existing ? existing.photos : []);
+      await apiSaveLearn(fd, eid);
+      showToast('✅ Learning updated in database.');
+      cancelLearnEdit();
+    } else {
+      fd.createdAt = Date.now();
+      await apiSaveLearn(fd);
+      showToast('✅ Learning saved to database.');
+      resetLearnForm();
     }
-    if (idx !== -1) {
-      fd.photos = learnPendingPhotos.length ? learnPendingPhotos : (learns[idx].photos || []);
-      learns[idx] = Object.assign({}, learns[idx], fd);
-    }
-    showToast('Learning updated.');
-    cancelLearnEdit();
-  } else {
-    fd.id = genId();
-    fd.createdAt = Date.now();
-    learns.push(fd);
-    showToast('Learning saved.');
+    await fetchLearns();
+  } catch (err) {
+    showToast('⚠️ Error saving learning: ' + err.message);
   }
-
-  saveLearns();
-  resetLearnForm();
-  renderLearnAll();
 }
 
 function editLearn(id) {
-  let l = null;
-  for (let i = 0; i < learns.length; i++) {
-    if (learns[i].id === id) {
-      l = learns[i];
-      break;
-    }
-  }
+  const l = learns.find(x => x.id === id);
   if (!l) return;
 
   els.learnEditId.value = l.id;
@@ -1702,6 +1374,7 @@ function cancelLearnEdit() {
 function resetLearnForm() {
   els.learnForm.reset();
   els.learnEditId.value = '';
+  setDefaultDates();
   $$('#tabLearn .btn-group').forEach(function(g) {
     g.querySelectorAll('.seg-btn').forEach(function(b) {
       b.classList.remove('active');
@@ -1720,13 +1393,16 @@ function promptLearnDelete(id) {
   els.learnDeleteModal.classList.add('active');
 }
 
-function confirmLearnDelete() {
+async function confirmLearnDelete() {
   if (!learnDeleteTargetId) return;
-  learns = learns.filter(function(l) { return l.id !== learnDeleteTargetId; });
-  saveLearns();
-  renderLearnAll();
+  try {
+    await apiDeleteLearn(learnDeleteTargetId);
+    await fetchLearns();
+    showToast('Learning deleted.');
+  } catch (err) {
+    showToast('⚠️ Error deleting: ' + err.message);
+  }
   closeModals();
-  showToast('Learning deleted.');
   learnDeleteTargetId = null;
 }
 
@@ -1738,12 +1414,15 @@ function promptClearLearn() {
   els.learnClearModal.classList.add('active');
 }
 
-function confirmClearLearn() {
-  learns = [];
-  saveLearns();
-  renderLearnAll();
+async function confirmClearLearn() {
+  try {
+    await apiClearLearns();
+    await fetchLearns();
+    showToast('All learnings cleared from database.');
+  } catch (err) {
+    showToast('⚠️ Error clearing learnings: ' + err.message);
+  }
   closeModals();
-  showToast('All learnings cleared.');
 }
 
 function handleLearnPhotoClick() {
@@ -1886,52 +1565,9 @@ function bindEvents() {
     });
   });
 
-  // Sync & Backup Header & Buttons
-  if (els.syncHeaderBtn) els.syncHeaderBtn.addEventListener('click', openSyncModal);
-  if (els.syncQuickBtn) els.syncQuickBtn.addEventListener('click', openSyncModal);
-  if (els.emptySyncBtn) els.emptySyncBtn.addEventListener('click', openSyncModal);
-  if (els.learnSyncBtn) els.learnSyncBtn.addEventListener('click', openSyncModal);
-  if (els.closeSyncModalBtn) els.closeSyncModalBtn.addEventListener('click', closeSyncModal);
-  if (els.closeSyncModalFooterBtn) els.closeSyncModalFooterBtn.addEventListener('click', closeSyncModal);
-
-  if (els.syncModal) {
-    els.syncModal.addEventListener('click', function(e) {
-      if (e.target === els.syncModal) closeSyncModal();
-    });
-  }
-
-  if (els.generateKeyBtn) els.generateKeyBtn.addEventListener('click', generateNewKey);
-  if (els.copyKeyBtn) els.copyKeyBtn.addEventListener('click', copySyncKey);
-  if (els.copySyncUrlBtn) els.copySyncUrlBtn.addEventListener('click', copyMobileDirectLink);
-
-  if (els.syncKeyInput) {
-    els.syncKeyInput.addEventListener('input', function(e) {
-      const k = e.target.value.trim();
-      localStorage.setItem(STORAGE_SYNC_KEY, k);
-      updateSyncUI(k);
-    });
-  }
-
-  if (els.uploadCloudBtn) els.uploadCloudBtn.addEventListener('click', function() { uploadToCloud(true); });
-  if (els.downloadCloudBtn) els.downloadCloudBtn.addEventListener('click', function() { downloadFromCloud(true); });
-
-  if (els.autoSyncToggle) {
-    els.autoSyncToggle.addEventListener('change', function(e) {
-      localStorage.setItem(STORAGE_AUTO_SYNC, e.target.checked ? 'true' : 'false');
-      if (e.target.checked) {
-        uploadToCloud(false);
-        showToast('Auto-Sync enabled.');
-      } else {
-        showToast('Auto-Sync disabled.');
-      }
-    });
-  }
-
   // Backup & Restore
   if (els.exportBackupBtn) els.exportBackupBtn.addEventListener('click', exportFullBackup);
   if (els.restoreBackupBtn) els.restoreBackupBtn.addEventListener('click', triggerBackupRestore);
-  if (els.modalExportBackupBtn) els.modalExportBackupBtn.addEventListener('click', exportFullBackup);
-  if (els.modalRestoreBackupBtn) els.modalRestoreBackupBtn.addEventListener('click', triggerBackupRestore);
   if (els.importBackupFile) els.importBackupFile.addEventListener('change', handleBackupFileImport);
 
   // Trade Form
@@ -1966,7 +1602,6 @@ function bindEvents() {
   }
 
   if (els.exportCsvBtn) els.exportCsvBtn.addEventListener('click', exportCSV);
-  if (els.exportExcelBtn) els.exportExcelBtn.addEventListener('click', exportExcel);
   if (els.importBtn) els.importBtn.addEventListener('click', importData);
   if (els.importFile) els.importFile.addEventListener('change', handleImport);
   if (els.clearAllBtn) els.clearAllBtn.addEventListener('click', promptClearAll);
@@ -2165,8 +1800,7 @@ function bindEvents() {
   // Keyboard Shortcuts
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      if (els.syncModal && els.syncModal.classList.contains('active')) closeSyncModal();
-      else if (els.strategyModal && els.strategyModal.classList.contains('active')) closeStrategyModal();
+      if (els.strategyModal && els.strategyModal.classList.contains('active')) closeStrategyModal();
       else if (els.tradeViewModal && els.tradeViewModal.classList.contains('active')) closeTradeView();
       else if (els.learnViewModal && els.learnViewModal.classList.contains('active')) closeLearnView();
       else if (els.lightboxOverlay && els.lightboxOverlay.classList.contains('active')) closeLightbox();

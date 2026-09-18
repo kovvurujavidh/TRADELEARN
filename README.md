@@ -4,9 +4,11 @@
 
 ### Your All-in-One Trading Journal & Learning Hub
 
-A clean, modern web app to **log every trade**, **capture lessons**, and **build winning strategies** — all stored locally in your browser.
+A clean, modern web app to **log every trade**, **capture lessons**, and **build winning strategies** — all backed by a centralized **SQL Database** connecting your lapop, tablet, and mobile devices in real-time.
 
-[![Netlify Status](https://img.shields.io/badge/deployed-netlify-brightgreen?style=for-the-badge&logo=netlify)](https://app.netlify.com)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
+[![Express](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)](#)
+[![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)](#)
 [![HTML](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](#)
 [![CSS](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](#)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
@@ -17,17 +19,24 @@ A clean, modern web app to **log every trade**, **capture lessons**, and **build
 
 ## ✨ Features
 
+### 💻 Full-Stack Architecture
+| Feature | Description |
+|---------|-------------|
+| **Central Database** | Powered by SQLite (local) or PostgreSQL (cloud). No more lost data in browser storage! |
+| **Multi-Device Sync** | Connect your Laptop and Mobile phone simultaneously on the same local network (Wi-Fi) |
+| **REST API** | Full Express API handling thousands of trades and embedded photo uploads seamlessly |
+| **Live Server Status** | Clean `🟢 DB Connected` header badge monitoring the live health payload in real-time |
+
 ### 📈 Record Trade Tab
 | Feature | Description |
 |---------|-------------|
 | **Smart Form** | Log 15M Bias, Liquidity, Sweep, MSS, Displacement, Entry, SL, TP, Result |
-| **Photo Upload** | Drag & drop up to 5 screenshots per trade (auto-compressed) |
+| **Photo Upload** | Drag & drop up to 5 screenshots per trade (auto-compressed on front-end to save DB space) |
 | **Notes & Description** | Write detailed notes about your setup |
 | **Live Stats** | Total trades, Win/Loss count, Win Rate, Current Streak |
 | **Breakdown Charts** | Visual bars for Bias, Liquidity, Sweep, MSS, Displacement |
-| **View Trade** | Full-screen modal with complete trade analysis |
 | **Trade History** | Search, filter (Bull/Bear/Win/Loss/SSL/BSL), and sort |
-| **Export** | CSV, Excel (.xls), and Import from CSV |
+| **Export/Import** | Full CSV parsing & exporting functionality + Master JSON bulk DB Backup |
 
 ### 📚 Learn Tab
 | Feature | Description |
@@ -36,10 +45,7 @@ A clean, modern web app to **log every trade**, **capture lessons**, and **build
 | **Strategy Editor** | Full-screen modal to write your trading rules |
 | **Learning Entries** | Save Patterns, Concepts, Mistakes, Wins, and Notes |
 | **Key Rules** | Dedicated field for takeaways and rules to remember |
-| **Photo Attachments** | Screenshot your charts and setups |
-| **View Learning** | Full-screen modal with complete learning details |
 | **Category Filters** | Filter by Pattern / Concept / Mistake / Win / Note |
-| **Export** | CSV export for all learnings |
 
 ### 🎨 Design
 - **Dark / Light Theme** — toggle with one click
@@ -49,41 +55,50 @@ A clean, modern web app to **log every trade**, **capture lessons**, and **build
 
 ---
 
-## 📸 Screenshots
+## 🚀 Quick Start (Local Setup)
 
-<div align="center">
+The absolute easiest way to run the application perfectly synced between your computer and your phone.
 
-| Desktop - Trade Tab | Desktop - Learn Tab |
-|:---:|:---:|
-| *Stats + Form + History* | *Strategies + Learnings* |
+### Prerequisites:
+- Install [Node.js](https://nodejs.org/en)
 
-| Mobile View | View Modal |
-|:---:|:---:|
-| *Compact mobile cards* | *Full trade analysis* |
+```bash
+# Clone the repository
+git clone https://github.com/kovvurujavidh/TRADELEARN.git
+cd TRADELEARN
 
-</div>
+# Install backend dependencies
+npm install
+
+# Start the server (Defaults to Port 3000 and SQLite Database)
+npm start
+```
+
+### Accessing the App:
+
+- **From your Desktop/Laptop**: Open your browser and go to `http://localhost:3000`
+- **From your Mobile Phone**: 
+  1. Ensure your phone and computer are on the **same Wi-Fi network**.
+  2. The terminal will print out your computer's local network IP address (e.g. `http://192.168.1.5:3000`).
+  3. Enter that exact URL into your phone's browser (Safari or Chrome).
+  4. Both devices are now using the identical database! Changes made on one instantly appear on the other.
 
 ---
 
-## 🚀 Quick Start
+## 🌍 Deploying to the Cloud
 
-### Option 1: Run Locally
-```bash
-# Clone the repo
-git clone https://github.com/kovvurujavidh/TRADELEARN.git
+If you want the app accessible from anywhere in the world (without keeping your computer running), you can deploy this full-stack app for free or cheap.
 
-# Open in browser
-cd TRADELEARN
-open index.html    # macOS
-start index.html   # Windows
-xdg-open index.html # Linux
-```
+### Platforms
 
-### Option 2: Deploy to Netlify
-1. Fork or clone this repo
-2. Go to [app.netlify.com](https://app.netlify.com)
-3. Drag the project folder onto the deploy area
-4. Done! Your live URL is ready
+The repository is deployment-ready for **Railway**, **Render**, **Fly.io**, or **Heroku**. 
+1. Create a Web Service/App on any provider.
+2. Link your GitHub repository.
+3. **Important Configuration:** Under Environment Variables in your hosting dashboard, add:
+   ```
+   DATABASE_URL=postgres://your_database_connection_url_here
+   ```
+4. The backend server automatically detects the `DATABASE_URL` and seamlessly switches from SQLite to PostgreSQL! Tables will auto-initialize on first run.
 
 ---
 
@@ -91,12 +106,11 @@ xdg-open index.html # Linux
 
 | Technology | Usage |
 |-----------|-------|
+| **Node.js + Express** | High-performance backend routing & REST API (`server.js`) |
+| **SQLite + pg** | Database Abstraction Layer supporting 0-setup local DB and powerful production PG |
 | **HTML5** | Semantic structure, forms, modals |
 | **CSS3** | CSS Variables, Grid, Flexbox, Animations |
-| **Vanilla JS** | Zero dependencies, pure JavaScript |
-| **localStorage** | All data persists in your browser |
-
-> **No frameworks. No libraries. No build tools.** Just three files that work anywhere.
+| **Vanilla JS** | Zero dependencies, pure frontend JavaScript performing asynchronous fetch calls |
 
 ---
 
@@ -104,95 +118,24 @@ xdg-open index.html # Linux
 
 ```
 TRADELEARN/
-├── index.html    # Main page with both tabs + all modals
-├── style.css     # Complete styling (light/dark theme)
-├── script.js     # All logic (CRUD, export, lightbox)
-└── README.md     # This file
+├── package.json   # Node configurations and dependencies
+├── server.js      # Express server handling routes and static files
+├── db.js          # SQLite / PostgreSQL DB connection logic
+├── data/          # (Auto-generated folder) local SQLite databases
+├── index.html     # Main Single Page Application interface
+├── style.css      # Component and layout styling
+├── script.js      # Client-side API fetch logic and DOM manipulation
+└── README.md      # This file
 ```
 
 ---
 
-## 🎯 How It Works
+## 💻 Full DB Backup & Restore
 
-### Adding a Trade
-1. Switch to **Record Trade** tab
-2. Fill in the form: Date, Bias, Liquidity, Sweep, MSS, Displacement, Entry, SL, TP, Result
-3. Optionally add **Notes** and **Photos**
-4. Click **Add Trade**
-
-### Viewing Trade Details
-1. In Trade History, click the **View** button
-2. A full-screen modal shows all trade details
-3. Click **Edit** in the modal to jump to the edit form
-
-### Saving Learnings
-1. Switch to **Learn** tab
-2. Fill in: Date, Category, Title, Description, Key Rules
-3. Add chart screenshots if needed
-4. Click **Save Learning**
-
-### Managing Strategies
-1. In the Learn tab, click **+ New Strategy**
-2. Name your strategy and write your rules
-3. Click **Save Strategy**
-4. Click any strategy card to view or edit it
-
----
-
-## ⌨️ Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `Escape` | Close any open modal or lightbox |
-| `←` `→` | Navigate photos in lightbox |
-
----
-
-## ☁️ Cross-Device Cloud Sync & Mobile Access
-
-By default, web browsers isolate `localStorage` to that specific computer or phone. **TradeLearn** includes built-in sync options to seamlessly connect your Laptop and Mobile:
-
-### 1. Instant Cloud Sync (Recommended)
-- Click **☁️ Sync / Backup** in the top navigation header.
-- Your unique **Sync Key** (e.g. `TRD-MYJOURNAL-782`) is automatically generated.
-- Click **⬆️ Upload to Cloud** from your laptop.
-- Scan the **QR Code** on your phone (or enter the key on mobile and click **⬇️ Download from Cloud**).
-- Enable **Auto-Sync** to automatically upload new trades and pull updates.
-
-### 2. Full Offline Backup & Restore (JSON)
-- Click **💾 Download Backup (.json)** to export all trades, strategies, notes, and screenshots in one portable file.
-- Send the file to your mobile phone (via WhatsApp, Email, AirDrop, etc.).
-- Click **📂 Restore from Backup** to load everything instantly.
-
----
-
-## 📊 Data Storage
-
-All data is stored in your browser's `localStorage`:
-
-| Key | Data |
-|-----|------|
-| `tradeJournalData` | All trade entries |
-| `tradeJournalLearns` | All learning entries |
-| `tradeJournalStrategy` | All strategy cards |
-| `tradeJournalTheme` | Light/Dark mode preference |
-| `tradeJournalSyncKey` | Device pairing sync key |
-| `tradeJournalAutoSync`| Auto-sync status preference |
-| `tradeJournalLastSync`| Timestamp of last sync |
-
-> **Note:** Data is 100% private to you. No signups or passwords required.
-
----
-
-## 🌐 Browser Support
-
-| Browser | Status |
-|---------|--------|
-| Chrome | ✅ Fully supported |
-| Firefox | ✅ Fully supported |
-| Safari | ✅ Fully supported |
-| Edge | ✅ Fully supported |
-| Mobile browsers | ✅ Fully responsive |
+Since everything is stored in an SQL database, keeping your data secure is easy:
+1. Click **💾 Download Backup (.json)** in the UI to perform a complete DB export.
+2. Store this `.json` file anywhere.
+3. If you move from a local SQLite setup to a cloud Postgres deployed app, just open the new app, click **📂 Restore Backup**, drag the `.json` file in, and your full history will instantly populate across the new SQL tables.
 
 ---
 
@@ -204,8 +147,6 @@ MIT License - feel free to use, modify, and distribute.
 
 <div align="center">
 
-**Built with ❤️ for traders who learn from every trade**
-
-⭐ Star this repo if you find it useful!
+**Built with ❤️ for traders who learn from every trade, now supercharged with SQL!**
 
 </div>

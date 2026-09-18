@@ -148,6 +148,24 @@ TRADELEARN/
 
 ---
 
+## ☁️ Cross-Device Cloud Sync & Mobile Access
+
+By default, web browsers isolate `localStorage` to that specific computer or phone. **TradeLearn** includes built-in sync options to seamlessly connect your Laptop and Mobile:
+
+### 1. Instant Cloud Sync (Recommended)
+- Click **☁️ Sync / Backup** in the top navigation header.
+- Your unique **Sync Key** (e.g. `TRD-MYJOURNAL-782`) is automatically generated.
+- Click **⬆️ Upload to Cloud** from your laptop.
+- Scan the **QR Code** on your phone (or enter the key on mobile and click **⬇️ Download from Cloud**).
+- Enable **Auto-Sync** to automatically upload new trades and pull updates.
+
+### 2. Full Offline Backup & Restore (JSON)
+- Click **💾 Download Backup (.json)** to export all trades, strategies, notes, and screenshots in one portable file.
+- Send the file to your mobile phone (via WhatsApp, Email, AirDrop, etc.).
+- Click **📂 Restore from Backup** to load everything instantly.
+
+---
+
 ## 📊 Data Storage
 
 All data is stored in your browser's `localStorage`:
@@ -158,8 +176,11 @@ All data is stored in your browser's `localStorage`:
 | `tradeJournalLearns` | All learning entries |
 | `tradeJournalStrategy` | All strategy cards |
 | `tradeJournalTheme` | Light/Dark mode preference |
+| `tradeJournalSyncKey` | Device pairing sync key |
+| `tradeJournalAutoSync`| Auto-sync status preference |
+| `tradeJournalLastSync`| Timestamp of last sync |
 
-> **Note:** Data stays on your browser. No server, no account needed.
+> **Note:** Data is 100% private to you. No signups or passwords required.
 
 ---
 

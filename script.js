@@ -186,6 +186,43 @@ function bindEvents(){
   $('#closeLearnViewBtn').addEventListener('click',closeLearnView);
   $('#learnViewEditBtn').addEventListener('click',learnViewEdit);
 
+  els.tradeTableBody.addEventListener('click',function(e){
+    var btn=e.target.closest('.action-btn');
+    if(!btn)return;
+    var id=btn.getAttribute('data-id');
+    if(btn.classList.contains('view-btn'))viewTrade(id);
+    else if(btn.classList.contains('edit-btn'))editTrade(id);
+    else if(btn.classList.contains('del-btn'))promptDelete(id);
+  });
+  els.mobileCards.addEventListener('click',function(e){
+    var btn=e.target.closest('.action-btn');
+    if(!btn)return;
+    var id=btn.getAttribute('data-id');
+    if(btn.classList.contains('view-btn'))viewTrade(id);
+    else if(btn.classList.contains('edit-btn'))editTrade(id);
+    else if(btn.classList.contains('del-btn'))promptDelete(id);
+  });
+  els.learnCards.addEventListener('click',function(e){
+    var btn=e.target.closest('.action-btn');
+    if(!btn)return;
+    var id=btn.getAttribute('data-id');
+    if(btn.classList.contains('learn-view-btn'))viewLearn(id);
+    else if(btn.classList.contains('learn-edit-btn'))editLearn(id);
+    else if(btn.classList.contains('learn-del-btn'))promptLearnDelete(id);
+  });
+  els.strategiesGrid.addEventListener('click',function(e){
+    var btn=e.target.closest('.action-btn');
+    if(!btn)return;
+    var id=btn.getAttribute('data-id');
+    if(btn.classList.contains('strat-edit-btn'))openStrategyModal(id);
+    else if(btn.classList.contains('strat-del-btn'))promptDeleteStrategy(id);
+  });
+  els.strategiesGrid.addEventListener('click',function(e){
+    var card=e.target.closest('.strategy-card');
+    if(!card||e.target.closest('.action-btn'))return;
+    openStrategyModal(card.getAttribute('data-id'));
+  });
+
   document.addEventListener('keydown',function(e){if(e.key==='Escape'){if($('#strategyModal').classList.contains('active'))closeStrategyModal();else if($('#tradeViewModal').classList.contains('active'))closeTradeView();else if($('#learnViewModal').classList.contains('active'))closeLearnView();else if(els.lightboxOverlay.classList.contains('active'))closeLightbox();else closeModals()}if(els.lightboxOverlay.classList.contains('active')){if(e.key==='ArrowLeft')lbPrev();if(e.key==='ArrowRight')lbNext()}});
 }
 

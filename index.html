@@ -1,0 +1,195 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Journal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">📊</div>
+      <div class="header-text">
+        <h1 class="brand">TradeTrack</h1>
+        <span class="header-date" id="headerDate"></span>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="trade">Record Trade</button>
+    <button class="tab-btn" data-tab="learn">Learn</button>
+  </nav>
+
+  <main class="container">
+
+    <!-- ==================== TRADE TAB ==================== -->
+    <div class="tab-content active" id="tabTrade">
+
+      <section class="card stats-card" id="statsCard">
+        <div class="stats-grid">
+          <div class="stat-item"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total</div></div>
+          <div class="stat-item stat-win"><div class="stat-value" id="statWins">0</div><div class="stat-label">Wins</div></div>
+          <div class="stat-item stat-loss"><div class="stat-value" id="statLosses">0</div><div class="stat-label">Losses</div></div>
+          <div class="stat-item"><div class="stat-value" id="statRate">0%</div><div class="stat-label">Win Rate</div></div>
+          <div class="stat-item"><div class="stat-value" id="statStreak">0</div><div class="stat-label">Streak</div></div>
+        </div>
+      </section>
+
+      <section class="card breakdown-card">
+        <div class="card-header"><h2 class="card-title">Breakdown</h2></div>
+        <div class="breakdown-grid" id="breakdownGrid"></div>
+      </section>
+
+      <section class="card" id="newTradeCard">
+        <div class="card-header">
+          <h2 class="card-title" id="formTitle">New Trade</h2>
+          <p class="card-subtitle" id="formSubtitle">Record the setup before you forget it.</p>
+        </div>
+        <form id="tradeForm" autocomplete="off">
+          <input type="hidden" id="editId">
+          <div class="form-group"><label class="form-label">Date</label><input type="date" id="fieldDate" required></div>
+          <div class="form-group"><label class="form-label">15M Bias</label><div class="btn-group" data-field="bias"><button type="button" class="seg-btn" data-value="Bull">Bull</button><button type="button" class="seg-btn" data-value="Bear">Bear</button><button type="button" class="seg-btn" data-value="Range">Range</button></div></div>
+          <div class="form-group"><label class="form-label">Liquidity</label><div class="btn-group" data-field="liquidity"><button type="button" class="seg-btn" data-value="SSL">SSL</button><button type="button" class="seg-btn" data-value="BSL">BSL</button></div></div>
+          <div class="form-group"><label class="form-label">Sweep</label><div class="btn-group" data-field="sweep"><button type="button" class="seg-btn" data-value="Yes">Yes</button><button type="button" class="seg-btn" data-value="No">No</button></div></div>
+          <div class="form-group"><label class="form-label">MSS</label><div class="btn-group" data-field="mss"><button type="button" class="seg-btn" data-value="Yes">Yes</button><button type="button" class="seg-btn" data-value="No">No</button></div></div>
+          <div class="form-group"><label class="form-label">Displacement</label><div class="btn-group" data-field="displacement"><button type="button" class="seg-btn" data-value="Yes">Yes</button><button type="button" class="seg-btn" data-value="No">No</button></div></div>
+          <div class="form-group"><label class="form-label">Entry</label><input type="text" id="fieldEntry" placeholder="e.g. 1.08500" required></div>
+          <div class="form-group"><label class="form-label">SL</label><input type="text" id="fieldSL" placeholder="e.g. 1.08200" required></div>
+          <div class="form-group"><label class="form-label">TP</label><input type="text" id="fieldTP" placeholder="e.g. 1.09000" required></div>
+          <div class="form-group"><label class="form-label">Result</label><div class="btn-group" data-field="result"><button type="button" class="seg-btn" data-value="Win">Win</button><button type="button" class="seg-btn" data-value="Loss">Loss</button></div></div>
+          <div class="form-group"><label class="form-label">Description / Notes</label><textarea id="fieldDescription" rows="3" placeholder="Optional notes about this trade..."></textarea></div>
+          <div class="form-group"><label class="form-label">Photos</label><div class="photo-upload-zone" id="photoUploadZone"><input type="file" id="photoInput" accept="image/*" multiple style="display:none;"><div class="upload-placeholder" id="uploadPlaceholder"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Drop images or click to upload</span></div><div class="upload-preview" id="uploadPreview"></div></div></div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary" id="submitBtn"><span id="submitBtnText">Add Trade</span></button><button type="button" class="btn btn-ghost" id="cancelEditBtn" style="display:none;">Cancel</button></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div><h2 class="section-title">Trade History</h2><p class="section-subtitle">Review every setup and execution.</p></div>
+          <div class="export-actions">
+            <button class="btn btn-outline" id="exportCsvBtn">Export CSV</button>
+            <button class="btn btn-outline" id="exportExcelBtn">Export Excel</button>
+            <button class="btn btn-outline" id="importBtn">Import Data</button>
+            <input type="file" id="importFile" accept=".csv" style="display:none;">
+            <button class="btn btn-danger-outline" id="clearAllBtn">Clear All</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" class="search-input" id="searchInput" placeholder="Search trades...">
+          <div class="filter-chips" id="filterChips">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="Bull">Bull</button>
+            <button class="chip" data-filter="Bear">Bear</button>
+            <button class="chip" data-filter="Range">Range</button>
+            <button class="chip" data-filter="Win">Win</button>
+            <button class="chip" data-filter="Loss">Loss</button>
+            <button class="chip" data-filter="SSL">SSL</button>
+            <button class="chip" data-filter="BSL">BSL</button>
+          </div>
+        </div>
+        <div class="table-wrap" id="tableWrap">
+          <table class="trade-table"><thead><tr><th>Date</th><th>15M Bias</th><th>Liquidity</th><th>Sweep</th><th>MSS</th><th>Displacement</th><th>Entry</th><th>SL</th><th>TP</th><th>Result</th><th>Actions</th></tr></thead><tbody id="tradeTableBody"></tbody></table>
+        </div>
+        <div class="mobile-cards" id="mobileCards"></div>
+        <div class="empty-state" id="emptyState" style="display:none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p class="empty-title">No trades recorded yet.</p>
+          <p class="empty-subtitle">Your trading history will appear here after your first entry.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== LEARN TAB ==================== -->
+    <div class="tab-content" id="tabLearn">
+
+      <section class="strategy-section">
+        <div class="section-header">
+          <div><h2 class="section-title">Strategies</h2><p class="section-subtitle">Define and reference your trading rules.</p></div>
+          <button class="btn btn-primary" id="addStrategyBtn">+ New Strategy</button>
+        </div>
+        <div class="strategies-grid" id="strategiesGrid"></div>
+        <div class="empty-state" id="strategiesEmptyState" style="display:none;">
+          <p class="empty-title">No strategies yet.</p>
+          <p class="empty-subtitle">Click "New Strategy" to define your first trading rules.</p>
+        </div>
+      </section>
+
+      <section class="card" id="learnFormCard">
+        <div class="card-header">
+          <h2 class="card-title" id="learnFormTitle">New Learning</h2>
+          <p class="card-subtitle" id="learnFormSubtitle">Save chart patterns, concepts, and insights.</p>
+        </div>
+        <form id="learnForm" autocomplete="off">
+          <input type="hidden" id="learnEditId">
+          <div class="form-group"><label class="form-label">Date</label><input type="date" id="learnDate" required></div>
+          <div class="form-group"><label class="form-label">Category</label><div class="btn-group" data-field="learnCategory"><button type="button" class="seg-btn" data-value="Pattern">Pattern</button><button type="button" class="seg-btn" data-value="Concept">Concept</button><button type="button" class="seg-btn" data-value="Mistake">Mistake</button><button type="button" class="seg-btn" data-value="Win">Win</button><button type="button" class="seg-btn" data-value="Note">Note</button></div></div>
+          <div class="form-group"><label class="form-label">Title</label><input type="text" id="learnTitle" placeholder="e.g. BOS + SSL Sweep setup" required></div>
+          <div class="form-group"><label class="form-label">Description</label><textarea id="learnDescription" rows="4" placeholder="What happened, what you learned..."></textarea></div>
+          <div class="form-group"><label class="form-label">Key Rules / Takeaways</label><textarea id="learnRules" rows="3" placeholder="Rules to remember next time..."></textarea></div>
+          <div class="form-group"><label class="form-label">Photos</label><div class="photo-upload-zone" id="learnPhotoZone"><input type="file" id="learnPhotoInput" accept="image/*" multiple style="display:none;"><div class="upload-placeholder" id="learnUploadPlaceholder"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Drop images or click to upload</span></div><div class="upload-preview" id="learnUploadPreview"></div></div></div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary" id="learnSubmitBtn"><span id="learnSubmitBtnText">Save Learning</span></button><button type="button" class="btn btn-ghost" id="learnCancelBtn" style="display:none;">Cancel</button></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div><h2 class="section-title">Learning History</h2><p class="section-subtitle">All your saved insights.</p></div>
+          <div class="export-actions">
+            <button class="btn btn-outline" id="exportLearnBtn">Export CSV</button>
+            <button class="btn btn-danger-outline" id="clearLearnBtn">Clear All</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" class="search-input" id="learnSearchInput" placeholder="Search learnings...">
+          <div class="filter-chips" id="learnFilterChips">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="Pattern">Pattern</button>
+            <button class="chip" data-filter="Concept">Concept</button>
+            <button class="chip" data-filter="Mistake">Mistake</button>
+            <button class="chip" data-filter="Win">Win</button>
+            <button class="chip" data-filter="Note">Note</button>
+          </div>
+        </div>
+        <div class="learn-cards" id="learnCards"></div>
+        <div class="empty-state" id="learnEmptyState" style="display:none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <p class="empty-title">No learnings saved yet.</p>
+          <p class="empty-subtitle">Start capturing your insights above.</p>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+  <div class="modal-overlay" id="deleteModal"><div class="modal"><div class="modal-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h3 class="modal-title">Delete this trade?</h3><p class="modal-text">This action cannot be undone.</p><div class="modal-actions"><button class="btn btn-ghost" id="cancelDeleteBtn">Cancel</button><button class="btn btn-danger" id="confirmDeleteBtn">Delete</button></div></div></div>
+  <div class="modal-overlay" id="clearModal"><div class="modal"><div class="modal-icon modal-icon-warning"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h3 class="modal-title">Clear all trades?</h3><p class="modal-text">This will permanently delete every trade.</p><div class="modal-actions"><button class="btn btn-ghost" id="cancelClearBtn">Cancel</button><button class="btn btn-danger" id="confirmClearBtn">Delete All</button></div></div></div>
+  <div class="modal-overlay" id="learnDeleteModal"><div class="modal"><div class="modal-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h3 class="modal-title">Delete this learning?</h3><p class="modal-text">This action cannot be undone.</p><div class="modal-actions"><button class="btn btn-ghost" id="cancelLearnDeleteBtn">Cancel</button><button class="btn btn-danger" id="confirmLearnDeleteBtn">Delete</button></div></div></div>
+  <div class="modal-overlay" id="learnClearModal"><div class="modal"><div class="modal-icon modal-icon-warning"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h3 class="modal-title">Clear all learnings?</h3><p class="modal-text">This will permanently delete every learning entry.</p><div class="modal-actions"><button class="btn btn-ghost" id="cancelLearnClearBtn">Cancel</button><button class="btn btn-danger" id="confirmLearnClearBtn">Delete All</button></div></div></div>
+
+  <!-- STRATEGY MODAL -->
+  <div class="modal-overlay" id="strategyModal"><div class="modal strategy-modal"><div class="strategy-modal-header"><div class="strategy-modal-title-wrap"><input type="text" id="strategyModalTitle" class="strategy-modal-title-input" placeholder="Strategy name..."><span class="strategy-modal-date" id="strategyModalDate"></span></div><button class="modal-close" id="closeStrategyModal">&times;</button></div><div class="strategy-modal-body"><textarea id="strategyModalTextarea" placeholder="Write your trading strategy here..."></textarea></div><div class="strategy-modal-footer"><button class="btn btn-ghost" id="cancelStrategyModalBtn">Cancel</button><button class="btn btn-danger-outline" id="deleteStrategyModalBtn">Delete</button><button class="btn btn-primary" id="saveStrategyModalBtn">Save Strategy</button></div></div></div>
+
+  <!-- TRADE VIEW MODAL -->
+  <div class="modal-overlay" id="tradeViewModal"><div class="modal view-modal"><div class="view-modal-header"><h3 class="view-modal-title">Trade Details</h3><button class="modal-close" id="closeTradeViewModal">&times;</button></div><div class="view-modal-body" id="tradeViewBody"></div><div class="view-modal-footer"><button class="btn btn-ghost" id="tradeViewEditBtn">Edit</button><button class="btn btn-ghost" id="closeTradeViewBtn">Close</button></div></div></div>
+
+  <!-- LEARN VIEW MODAL -->
+  <div class="modal-overlay" id="learnViewModal"><div class="modal view-modal"><div class="view-modal-header"><h3 class="view-modal-title">Learning Details</h3><button class="modal-close" id="closeLearnViewModal">&times;</button></div><div class="view-modal-body" id="learnViewBody"></div><div class="view-modal-footer"><button class="btn btn-ghost" id="learnViewEditBtn">Edit</button><button class="btn btn-ghost" id="closeLearnViewBtn">Close</button></div></div></div>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox-overlay" id="lightboxOverlay">
+    <button class="lightbox-close" id="lightboxClose">&times;</button>
+    <button class="lightbox-nav lightbox-prev" id="lightboxPrev">&#8249;</button>
+    <div class="lightbox-content"><img id="lightboxImg" src="" alt="Screenshot"></div>
+    <button class="lightbox-nav lightbox-next" id="lightboxNext">&#8250;</button>
+    <div class="lightbox-counter" id="lightboxCounter">1 / 1</div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

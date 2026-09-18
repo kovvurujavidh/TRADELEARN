@@ -149,7 +149,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);line
 .learn-card-rules-label{font-size:.72rem;font-weight:600;color:var(--steel-blue);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
 .learn-card-rules-text{font-size:.82rem;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap}
 .learn-card-photos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.learn-card-photo{width:70px;height:70px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
+.learn-card-photo{width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
 .learn-card-actions{display:flex;gap:6px;padding-top:8px;border-top:1px solid var(--border)}
 .view-modal{width:90vw;max-width:600px;max-height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden;text-align:left}
 .view-modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
@@ -162,7 +162,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);line
 .view-value{font-size:.88rem;font-weight:500;text-align:right}
 .view-section-title{font-size:.82rem;font-weight:700;color:var(--steel-blue);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.3px}
 .view-photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.view-photo{width:100px;height:100px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
+.view-photo{width:140px;height:140px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border)}
 .view-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.7;white-space:pre-wrap;margin-top:8px}
 .lightbox-overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s ease}
 .lightbox-overlay.active{opacity:1;pointer-events:all}
